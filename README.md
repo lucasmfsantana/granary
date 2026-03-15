@@ -70,20 +70,6 @@ granary version    # Show version
 granary help       # Show help
 ```
 
-## ⏰ Alternative: cron
-
-If you prefer cron over the built-in LaunchAgent:
-
-```bash
-crontab -e
-```
-
-Add this line:
-
-```bash
-0 */6 * * * /opt/homebrew/bin/granary run >> /tmp/granary.log 2>&1
-```
-
 ## ⚙️ How it works
 
 - **Reads from:** `~/Library/Application Support/Granola/cache-v*.json` (auto-detects version)
