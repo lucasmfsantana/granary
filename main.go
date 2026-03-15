@@ -1,69 +1,101 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/wassimk/granola-exporter/exporter"
+	"github.com/spf13/cobra"
+	"github.com/wassimk/granary/exporter"
+	"github.com/wassimk/granary/service"
 )
 
 // version is set at build time via ldflags
 var version = "dev"
 
 func main() {
-	// Define flags
-	var (
-		showVersion bool
-		showHelp    bool
-		outputDir   string
-	)
-
-	flag.BoolVar(&showVersion, "version", false, "Show version number")
-	flag.BoolVar(&showVersion, "V", false, "Show version number (shorthand)")
-	flag.BoolVar(&showHelp, "help", false, "Show help message")
-	flag.BoolVar(&showHelp, "h", false, "Show help message (shorthand)")
-	flag.StringVar(&outputDir, "output-dir", "", "Custom output directory")
-	flag.StringVar(&outputDir, "o", "", "Custom output directory (shorthand)")
-
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "granola-exporter - Export Granola meeting notes and transcripts to markdown\n\n")
-		fmt.Fprintf(os.Stderr, "Usage: granola-exporter [flags]\n\n")
-		fmt.Fprintf(os.Stderr, "Flags:\n")
-		fmt.Fprintf(os.Stderr, "  -h, --help         Show this help message\n")
-		fmt.Fprintf(os.Stderr, "  -V, --version      Show version number\n")
-		fmt.Fprintf(os.Stderr, "  -o, --output-dir   Custom output directory (default: ~/.local/share/granola-transcripts)\n")
+	rootCmd := &cobra.Command{
+		Use:   "granary",
+		Short: "Export Granola meeting notes and transcripts to markdown",
 	}
 
-	flag.Parse()
-
-	// Handle --help
-	if showHelp {
-		flag.Usage()
-		os.Exit(0)
+	// run
+	var outputDir string
+	runCmd := &cobra.Command{
+		Use:   "run",
+		Short: "Run the export",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if outputDir == "" {
+				outputDir = exporter.DefaultOutputDir()
+			}
+			return runExport(outputDir)
+		},
 	}
+	runCmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "Custom output directory (default: ~/.local/share/granola-transcripts)")
+	rootCmd.AddCommand(runCmd)
 
-	// Handle --version
-	if showVersion {
-		fmt.Println(strings.TrimPrefix(version, "v"))
-		os.Exit(0)
+	// install
+	var force bool
+	installCmd := &cobra.Command{
+		Use:   "install",
+		Short: "Install macOS LaunchAgent for scheduled exports",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return service.Install(force)
+		},
 	}
+	installCmd.Flags().BoolVar(&force, "force", false, "Overwrite existing LaunchAgent")
+	rootCmd.AddCommand(installCmd)
 
-	// Set default output directory
-	if outputDir == "" {
-		outputDir = exporter.DefaultOutputDir()
+	// uninstall
+	uninstallCmd := &cobra.Command{
+		Use:   "uninstall",
+		Short: "Remove the LaunchAgent",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return service.Uninstall()
+		},
 	}
+	rootCmd.AddCommand(uninstallCmd)
 
-	// Run the export
-	if err := run(outputDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	// status
+	statusCmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show whether the LaunchAgent is installed and running",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			installed, running, err := service.Status()
+			if err != nil {
+				return err
+			}
+
+			label := service.Label
+			plist := service.PlistPath()
+			logDir := service.LogDir()
+
+			fmt.Printf("Label:     %s\n", label)
+			fmt.Printf("Plist:     %s\n", plist)
+			fmt.Printf("Logs:      %s\n", logDir)
+			fmt.Printf("Installed: %v\n", installed)
+			fmt.Printf("Running:   %v\n", running)
+			return nil
+		},
+	}
+	rootCmd.AddCommand(statusCmd)
+
+	// version
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Show version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(strings.TrimPrefix(version, "v"))
+		},
+	}
+	rootCmd.AddCommand(versionCmd)
+
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-func run(outputDir string) error {
-	// Find cache file
+func runExport(outputDir string) error {
 	cachePath, err := exporter.FindCacheFile()
 	if err != nil {
 		return err
@@ -71,7 +103,6 @@ func run(outputDir string) error {
 
 	fmt.Printf("Loading cache from: %s\n", cachePath)
 
-	// Get cache size
 	cacheSize, err := exporter.GetCacheSize(cachePath)
 	if err != nil {
 		return fmt.Errorf("failed to get cache size: %w", err)
@@ -79,7 +110,6 @@ func run(outputDir string) error {
 	cacheSizeMB := float64(cacheSize) / 1024.0 / 1024.0
 	fmt.Printf("Cache size: %.1f MB\n\n", cacheSizeMB)
 
-	// Load and parse cache
 	fmt.Println("Parsing cache...")
 	state, err := exporter.LoadCache(cachePath)
 	if err != nil {
@@ -89,14 +119,12 @@ func run(outputDir string) error {
 	fmt.Printf("Found %d documents\n", len(state.Documents))
 	fmt.Printf("Found %d transcripts\n\n", len(state.Transcripts))
 
-	// Export documents
 	exp := exporter.NewExporter(outputDir)
 	result, err := exp.Export(state, true)
 	if err != nil {
 		return err
 	}
 
-	// Print summary
 	result.PrintSummary(outputDir)
 
 	return nil
