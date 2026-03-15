@@ -61,9 +61,12 @@ func (e *Exporter) Export(state *CacheState, verbose bool) (*ExportResult, error
 		fmt.Println(strings.Repeat("=", 70))
 	}
 
+	// Build filename map: assign unique filenames using document ID for collisions
+	filenameMap := buildFilenameMap(exportable)
+
 	// Export each document
 	for _, doc := range exportable {
-		err := e.exportDocument(&doc, state.Transcripts, result, verbose)
+		err := e.exportDocument(&doc, state.Transcripts, filenameMap, result, verbose)
 		if err != nil {
 			result.Errors = append(result.Errors, ExportError{
 				DocumentID: doc.ID,
@@ -83,15 +86,48 @@ func (e *Exporter) Export(state *CacheState, verbose bool) (*ExportResult, error
 	return result, nil
 }
 
-func (e *Exporter) exportDocument(doc *Document, transcripts map[string][]TranscriptEntry, result *ExportResult, verbose bool) error {
-	title := doc.Title
-	if title == "" {
-		title = "Untitled"
+// buildFilenameMap assigns a stable unique filename to each document.
+// Documents with unique title+date get the normal filename.
+// Documents that collide get a short ID suffix appended.
+func buildFilenameMap(docs []Document) map[string]string {
+	// Count how many documents produce each filename
+	filenameCounts := make(map[string]int)
+	for _, doc := range docs {
+		title := doc.Title
+		if title == "" {
+			title = "Untitled"
+		}
+		dateStr := FormatDateForFilename(doc.CreatedAt)
+		filename := SafeFilename(title, dateStr)
+		filenameCounts[filename]++
 	}
 
-	// Get date string for filename
-	dateStr := FormatDateForFilename(doc.CreatedAt)
+	// Assign filenames: use ID suffix only for collisions
+	result := make(map[string]string, len(docs))
+	for _, doc := range docs {
+		title := doc.Title
+		if title == "" {
+			title = "Untitled"
+		}
+		dateStr := FormatDateForFilename(doc.CreatedAt)
+		filename := SafeFilename(title, dateStr)
 
+		if filenameCounts[filename] > 1 {
+			shortID := doc.ID
+			if len(shortID) > 8 {
+				shortID = shortID[:8]
+			}
+			base := strings.TrimSuffix(filename, ".md")
+			filename = fmt.Sprintf("%s (%s).md", base, shortID)
+		}
+
+		result[doc.ID] = filename
+	}
+
+	return result
+}
+
+func (e *Exporter) exportDocument(doc *Document, transcripts map[string][]TranscriptEntry, filenameMap map[string]string, result *ExportResult, verbose bool) error {
 	// Get transcript if available
 	transcript := transcripts[doc.ID]
 
@@ -102,8 +138,7 @@ func (e *Exporter) exportDocument(doc *Document, transcripts map[string][]Transc
 		return nil
 	}
 
-	// Generate filename
-	filename := SafeFilename(title, dateStr)
+	filename := filenameMap[doc.ID]
 	outputPath := filepath.Join(e.OutputDir, filename)
 
 	// If file exists and cache has no transcript, try to preserve transcript from file
