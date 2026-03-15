@@ -95,6 +95,27 @@ func TestParseCache(t *testing.T) {
 		}
 	})
 
+	t.Run("parses cache as direct object (v6+ format)", func(t *testing.T) {
+		data := []byte(`{
+			"cache": {"state":{"documents":{"doc1":{"id":"doc1","title":"Test","created_at":"2026-01-21T10:00:00Z","notes_markdown":"# Notes","notes_plain":"Notes"}},"transcripts":{"doc1":[{"id":"t1","document_id":"doc1","text":"Hello","source":"microphone"}]}}}
+		}`)
+
+		state, err := ParseCache(data)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		if len(state.Documents) != 1 {
+			t.Errorf("Expected 1 document, got %d", len(state.Documents))
+		}
+		if state.Documents["doc1"].Title != "Test" {
+			t.Errorf("Expected title 'Test', got %s", state.Documents["doc1"].Title)
+		}
+		if len(state.Transcripts) != 1 {
+			t.Errorf("Expected 1 transcript, got %d", len(state.Transcripts))
+		}
+	})
+
 	t.Run("returns error for invalid outer JSON", func(t *testing.T) {
 		data := []byte(`not valid json`)
 

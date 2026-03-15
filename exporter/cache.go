@@ -62,12 +62,12 @@ func extractVersion(path string) int {
 	return v
 }
 
-// outerCache represents the outer JSON structure of the cache file.
-type outerCache struct {
-	Cache string `json:"cache"`
+// outerCacheRaw is used to detect whether the "cache" field is a string or object.
+type outerCacheRaw struct {
+	Cache json.RawMessage `json:"cache"`
 }
 
-// innerCache represents the inner JSON structure (parsed from the cache string).
+// innerCache represents the inner JSON structure containing the state.
 type innerCache struct {
 	State CacheState `json:"state"`
 }
@@ -83,21 +83,37 @@ func LoadCache(path string) (*CacheState, error) {
 }
 
 // ParseCache parses the Granola cache from raw JSON bytes.
-// The cache has a nested structure: outer JSON contains a "cache" key with a JSON string value.
+// Supports two formats:
+//   - Legacy (cache-v5 and earlier): "cache" is a JSON string containing nested JSON
+//   - Current (cache-v6+): "cache" is a direct JSON object
 func ParseCache(data []byte) (*CacheState, error) {
-	// Parse outer JSON
-	var outer outerCache
+	var outer outerCacheRaw
 	if err := json.Unmarshal(data, &outer); err != nil {
-		return nil, fmt.Errorf("failed to parse outer cache JSON: %w", err)
+		return nil, fmt.Errorf("failed to parse cache JSON: %w", err)
 	}
 
-	if outer.Cache == "" {
+	if len(outer.Cache) == 0 {
 		return nil, fmt.Errorf("cache field is empty")
 	}
 
-	// Parse inner JSON (the cache string)
+	var innerData []byte
+
+	// If cache is a JSON string, unwrap it; otherwise use it directly
+	if outer.Cache[0] == '"' {
+		var cacheStr string
+		if err := json.Unmarshal(outer.Cache, &cacheStr); err != nil {
+			return nil, fmt.Errorf("failed to parse cache string: %w", err)
+		}
+		if cacheStr == "" {
+			return nil, fmt.Errorf("cache field is empty")
+		}
+		innerData = []byte(cacheStr)
+	} else {
+		innerData = outer.Cache
+	}
+
 	var inner innerCache
-	if err := json.Unmarshal([]byte(outer.Cache), &inner); err != nil {
+	if err := json.Unmarshal(innerData, &inner); err != nil {
 		return nil, fmt.Errorf("failed to parse inner cache JSON: %w", err)
 	}
 
