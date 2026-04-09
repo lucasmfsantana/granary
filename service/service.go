@@ -45,7 +45,7 @@ func generatePlist(binaryPath string) string {
         <string>run</string>
     </array>
     <key>StartInterval</key>
-    <integer>21600</integer>
+    <integer>7200</integer>
     <key>StandardOutPath</key>
     <string>%s</string>
     <key>StandardErrorPath</key>
@@ -98,7 +98,7 @@ func Install(force bool) error {
 	fmt.Printf("  Plist: %s\n", plist)
 	fmt.Printf("  Logs:  %s\n", LogDir())
 	fmt.Println()
-	fmt.Println("The service will run `granary run` every 6 hours.")
+	fmt.Println("The service will run `granary run` every 2 hours.")
 	return nil
 }
 

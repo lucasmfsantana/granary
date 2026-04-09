@@ -39,7 +39,7 @@ brews:
     install: |
       bin.install "granary"
     caveats: |
-      To start granary as a background service (exports every 6 hours):
+      To start granary as a background service (exports every 2 hours):
         granary install
 
       To remove the background service:

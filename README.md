@@ -2,7 +2,7 @@
 
 Exports meeting notes and transcripts from [Granola](https://www.granola.so)'s local cache to markdown files.
 
-Granary exports AI-generated notes and full transcripts to markdown. It auto-detects the latest Granola cache version, only writes changed files, and preserves transcripts even after Granola purges them from its cache. A built-in macOS LaunchAgent can run exports automatically every 6 hours.
+Granary exports AI-generated notes and full transcripts to markdown. It auto-detects the latest Granola cache version, only writes changed files, and preserves transcripts even after Granola purges them from its cache. A built-in macOS LaunchAgent can run exports automatically every 2 hours.
 
 ## 🛠️ Installation
 
@@ -36,7 +36,7 @@ By default, Granary reads from `~/Library/Application Support/Granola/cache-v*.j
 
 ### Background service (LaunchAgent)
 
-Install a macOS LaunchAgent that automatically exports every 6 hours:
+Install a macOS LaunchAgent that automatically exports every 2 hours:
 
 ```bash
 granary install
