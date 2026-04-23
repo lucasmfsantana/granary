@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -60,6 +61,9 @@ func generatePlist(binaryPath string) string {
 }
 
 func Install(force bool) error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("service management is not supported on Windows\nUse Windows Task Scheduler to run 'granary run' every 2 hours")
+	}
 	plist := PlistPath()
 
 	if _, err := os.Stat(plist); err == nil && !force {
@@ -103,6 +107,9 @@ func Install(force bool) error {
 }
 
 func Uninstall() error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("service management is not supported on Windows\nUse Windows Task Scheduler to manage scheduled tasks")
+	}
 	// Unload (ignore errors if not loaded)
 	_ = exec.Command("launchctl", "bootout", fmt.Sprintf("gui/%s/%s", currentUID(), Label)).Run()
 
@@ -120,6 +127,9 @@ func Uninstall() error {
 }
 
 func Status() (installed bool, running bool, err error) {
+	if runtime.GOOS == "windows" {
+		return false, false, fmt.Errorf("service management is not supported on Windows\nUse Windows Task Scheduler to check scheduled tasks")
+	}
 	err = exec.Command("launchctl", "list", Label).Run()
 	running = err == nil
 	err = nil

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 )
@@ -13,15 +14,33 @@ import (
 // cacheVersionRegex extracts the version number from cache-vN.json filenames.
 var cacheVersionRegex = regexp.MustCompile(`cache-v(\d+)\.json$`)
 
-// FindCacheFile finds the latest Granola cache file.
-// Returns the path to the cache file with the highest version number.
-func FindCacheFile() (string, error) {
+// granolaDir returns the platform-specific path to Granola's data directory.
+func granolaDir() (string, error) {
+	if runtime.GOOS == "windows" {
+		appData := os.Getenv("APPDATA")
+		if appData == "" {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("failed to get home directory: %w", err)
+			}
+			appData = filepath.Join(homeDir, "AppData", "Roaming")
+		}
+		return filepath.Join(appData, "Granola"), nil
+	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
+	return filepath.Join(homeDir, "Library", "Application Support", "Granola"), nil
+}
 
-	granolaDir := filepath.Join(homeDir, "Library", "Application Support", "Granola")
+// FindCacheFile finds the latest Granola cache file.
+// Returns the path to the cache file with the highest version number.
+func FindCacheFile() (string, error) {
+	granolaDir, err := granolaDir()
+	if err != nil {
+		return "", err
+	}
 
 	// Find all cache-v*.json files
 	pattern := filepath.Join(granolaDir, "cache-v*.json")

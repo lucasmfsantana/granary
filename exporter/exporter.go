@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -35,6 +36,9 @@ func NewExporter(outputDir string) *Exporter {
 // DefaultOutputDir returns the default output directory path.
 func DefaultOutputDir() string {
 	homeDir, _ := os.UserHomeDir()
+	if runtime.GOOS == "windows" {
+		return filepath.Join(homeDir, "Desktop", "Obsidian Repediu", "obsidian-repediu-lucas", "00-inbox")
+	}
 	return filepath.Join(homeDir, ".local", "share", "granola-transcripts")
 }
 
