@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// FormatDocumentMarkdown formats a document and its transcript as markdown.
-func FormatDocumentMarkdown(doc *Document, transcript []TranscriptEntry) string {
+// FormatDocumentMarkdown formats a document and its notes as markdown.
+func FormatDocumentMarkdown(doc *Document, notes string) string {
 	var lines []string
 
 	title := doc.Title
@@ -24,37 +24,11 @@ func FormatDocumentMarkdown(doc *Document, transcript []TranscriptEntry) string 
 	lines = append(lines, "---")
 	lines = append(lines, "")
 
-	// Add AI-generated notes if they exist
-	notes := doc.GetNotes()
-	hasNotes := notes != "" && strings.TrimSpace(notes) != ""
-
-	if hasNotes {
+	if notes != "" && strings.TrimSpace(notes) != "" {
 		lines = append(lines, "## AI-Generated Notes")
 		lines = append(lines, "")
 		lines = append(lines, notes)
 		lines = append(lines, "")
-	}
-
-	// Add transcript if it exists
-	hasTranscript := len(transcript) > 0
-	if hasTranscript {
-		if hasNotes {
-			lines = append(lines, "---")
-			lines = append(lines, "")
-		}
-		lines = append(lines, "## Transcript")
-		lines = append(lines, "")
-
-		for _, entry := range transcript {
-			text := strings.TrimSpace(entry.Text)
-			if text == "" {
-				continue
-			}
-
-			speaker := SourceToSpeaker(entry.Source)
-			lines = append(lines, fmt.Sprintf("**%s:** %s", speaker, text))
-			lines = append(lines, "")
-		}
 	}
 
 	return strings.Join(lines, "\n")

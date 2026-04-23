@@ -77,40 +77,6 @@ Just notes, no transcript.
 		}
 	})
 
-	t.Run("roundtrip format then extract", func(t *testing.T) {
-		doc := &Document{
-			ID:        "test",
-			Title:     "Test",
-			CreatedAt: "2026-01-21T10:00:00Z",
-		}
-		originalTranscript := []TranscriptEntry{
-			{Text: "Hello from me", Source: "microphone"},
-			{Text: "Hello from them", Source: "system"},
-		}
-
-		formatted := FormatDocumentMarkdown(doc, originalTranscript)
-		extracted := ExtractTranscriptFromMarkdown(formatted)
-
-		if extracted == nil {
-			t.Fatal("Expected non-nil result")
-		}
-		if len(extracted) != 2 {
-			t.Fatalf("Expected 2 entries, got %d", len(extracted))
-		}
-		if extracted[0].Text != "Hello from me" {
-			t.Errorf("Expected 'Hello from me', got %q", extracted[0].Text)
-		}
-		if extracted[0].Source != "microphone" {
-			t.Errorf("Expected 'microphone', got %s", extracted[0].Source)
-		}
-		if extracted[1].Text != "Hello from them" {
-			t.Errorf("Expected 'Hello from them', got %q", extracted[1].Text)
-		}
-		if extracted[1].Source != "system" {
-			t.Errorf("Expected 'system', got %s", extracted[1].Source)
-		}
-	})
-
 	t.Run("handles transcript with only one entry", func(t *testing.T) {
 		content := `## Transcript
 

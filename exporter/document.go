@@ -20,11 +20,32 @@ type TranscriptEntry struct {
 	IsFinal        bool   `json:"is_final"`
 }
 
+// ChatContext holds the active editor state from Granola's multi-chat state.
+type ChatContext struct {
+	MeetingID            string `json:"meetingId"`
+	ActiveEditorMarkdown string `json:"activeEditorMarkdown"`
+}
+
+// MultiChatState holds the active chat context, which contains the AI-generated notes.
+type MultiChatState struct {
+	ChatContext ChatContext `json:"chatContext"`
+}
+
 // CacheState holds the parsed state from the Granola cache.
 type CacheState struct {
 	Documents       map[string]Document          `json:"documents"`
 	SharedDocuments map[string]Document          `json:"sharedDocuments"`
 	Transcripts     map[string][]TranscriptEntry `json:"transcripts"`
+	MultiChatState  MultiChatState               `json:"multiChatState"`
+}
+
+// GetAINotes returns the AI-generated markdown for a document if available.
+// Granola stores AI notes for the currently active document in multiChatState.
+func (s *CacheState) GetAINotes(docID string) string {
+	if s.MultiChatState.ChatContext.MeetingID == docID {
+		return s.MultiChatState.ChatContext.ActiveEditorMarkdown
+	}
+	return ""
 }
 
 // AllDocuments returns all documents (owned + shared) as a single map.

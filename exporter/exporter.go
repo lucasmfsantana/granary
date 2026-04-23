@@ -54,7 +54,7 @@ func (e *Exporter) Export(state *CacheState, verbose bool) (*ExportResult, error
 	// Collect exportable documents (owned + shared)
 	var exportable []Document
 	for _, doc := range state.AllDocuments() {
-		if doc.HasExportableContent(state.Transcripts) {
+		if doc.HasExportableContent(state.Transcripts) || state.GetAINotes(doc.ID) != "" {
 			exportable = append(exportable, doc)
 		}
 	}
@@ -70,7 +70,7 @@ func (e *Exporter) Export(state *CacheState, verbose bool) (*ExportResult, error
 
 	// Export each document
 	for _, doc := range exportable {
-		err := e.exportDocument(&doc, state.Transcripts, filenameMap, result, verbose)
+		err := e.exportDocument(&doc, state, filenameMap, result, verbose)
 		if err != nil {
 			result.Errors = append(result.Errors, ExportError{
 				DocumentID: doc.ID,
@@ -131,13 +131,14 @@ func buildFilenameMap(docs []Document) map[string]string {
 	return result
 }
 
-func (e *Exporter) exportDocument(doc *Document, transcripts map[string][]TranscriptEntry, filenameMap map[string]string, result *ExportResult, verbose bool) error {
-	// Get transcript if available
-	transcript := transcripts[doc.ID]
+func (e *Exporter) exportDocument(doc *Document, state *CacheState, filenameMap map[string]string, result *ExportResult, verbose bool) error {
+	// Prefer AI-generated notes from multiChatState; fall back to manual notes
+	notes := state.GetAINotes(doc.ID)
+	if notes == "" {
+		notes = doc.GetNotes()
+	}
 
-	// Check if both notes and transcript are empty
-	notes := doc.GetNotes()
-	if (notes == "" || strings.TrimSpace(notes) == "") && len(transcript) == 0 {
+	if strings.TrimSpace(notes) == "" {
 		result.Empty++
 		return nil
 	}
@@ -145,16 +146,7 @@ func (e *Exporter) exportDocument(doc *Document, transcripts map[string][]Transc
 	filename := filenameMap[doc.ID]
 	outputPath := filepath.Join(e.OutputDir, filename)
 
-	// If file exists and cache has no transcript, try to preserve transcript from file
-	if _, err := os.Stat(outputPath); err == nil && len(transcript) == 0 {
-		existingContent, err := os.ReadFile(outputPath)
-		if err == nil && strings.Contains(string(existingContent), "## Transcript") {
-			transcript = ExtractTranscriptFromMarkdown(string(existingContent))
-		}
-	}
-
-	// Format content with latest notes and best available transcript
-	content := FormatDocumentMarkdown(doc, transcript)
+	content := FormatDocumentMarkdown(doc, notes)
 
 	// Check if file exists and content is identical
 	if existingContent, err := os.ReadFile(outputPath); err == nil {
@@ -170,24 +162,11 @@ func (e *Exporter) exportDocument(doc *Document, transcripts map[string][]Transc
 	}
 
 	if verbose {
-		// Count words
 		wordCount := len(strings.Fields(content))
-
-		// Get file size
 		info, _ := os.Stat(outputPath)
 		fileSize := info.Size()
-
-		// Describe what was included
-		var contentParts []string
-		if notes != "" && strings.TrimSpace(notes) != "" {
-			contentParts = append(contentParts, "notes")
-		}
-		if len(transcript) > 0 {
-			contentParts = append(contentParts, fmt.Sprintf("transcript (%d entries)", len(transcript)))
-		}
-
 		fmt.Printf("✓ %s\n", filename)
-		fmt.Printf("  [%s] %s words, %s bytes\n", strings.Join(contentParts, " + "), NumberWithCommas(wordCount), NumberWithCommas(int(fileSize)))
+		fmt.Printf("  %s words, %s bytes\n", NumberWithCommas(wordCount), NumberWithCommas(int(fileSize)))
 	}
 
 	result.Written++
